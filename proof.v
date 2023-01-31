@@ -2,6 +2,7 @@ Require Import Coq.Lists.List.
 Require Import ZArith.
 Require Import Coq.ZArith.BinInt.
 Require Import Coq.ZArith.Zorder.
+From Coq Require Import Lia.
 
 Require Import Coq.Classes.RelationClasses.
 
@@ -14,73 +15,65 @@ Fixpoint dot_product (l1: list Z) (l2: list Z) : Z
     | (h1::t1, h2::t2) => (Z.mul h1 h2) + (dot_product t1 t2)
     end.
 
-Inductive AllPositive: list Z -> Prop
-:=  | AllPosNil : AllPositive nil
-    | AllPosCons (hd: Z) tl : (0 <= hd)%Z -> AllPositive tl -> AllPositive (hd :: tl).
+Inductive all_positive: list Z -> Prop
+:=  | ap_nil : all_positive nil
+    | ap_cons (hd: Z) tl : (0 <= hd)%Z -> all_positive tl -> all_positive (hd :: tl).
 
 Example allpos1 :
-  AllPositive [ 1%Z; 2%Z; 3%Z ].
+  all_positive [ 1%Z; 2%Z; 3%Z ].
 Proof. 
-  apply AllPosCons. apply Pos2Z.is_nonneg.
-  apply AllPosCons. apply Pos2Z.is_nonneg.
-  apply AllPosCons. apply Pos2Z.is_nonneg.
-  apply AllPosNil. Qed.
-
-
-Goal forall (n : Z) l, (~ nil = n :: l).
-  Proof.
-    intros n z H.
-    (* This tactic replaces the goal with an equivalent one. *)
-  change (match (@nil Z) with
-          | nil => False
-          | n :: z => True
-          end
-    ).
-    (* simpl. *)
-    rewrite H.
-    constructor.
-    Qed.
-
-Goal 0 <> 1.
-Proof.
-  intros H.
-  change (match O with 
-          | O   => False
-          | S _ => True
-          end
-  ).
-  rewrite H. constructor.
-  Qed.
+  apply ap_cons. apply Pos2Z.is_nonneg.
+  apply ap_cons. apply Pos2Z.is_nonneg.
+  apply ap_cons. apply Pos2Z.is_nonneg.
+  apply ap_nil. Qed.
 
 Example allpos2 :
-  ~ AllPositive [ 1%Z; 2%Z; (-3)%Z ].
+  ~ all_positive [ 1%Z; 2%Z; (-3)%Z ].
 Proof.
   intros H. inversion H. subst. 
   inversion H3. subst.
   inversion H5. subst.
-  Admitted.
+  lia. Qed.
+  
+(*    | ge_nil_l l2: ge_list nil l2
+   | ge_nil_r l1: ge_list l1 nil   *)
+
+Inductive ge_list : list Z -> list Z -> Prop
+:= | ge_nil: ge_list nil nil
+   | ge_l1_l2 h1 t1 h2 t2: (h1 >= h2)%Z -> ge_list t1 t2 -> ge_list (h1::t1) (h2::t2).
+
+Example ge_list_1: ge_list [1; 2; 3]%Z [1; 2; 3]%Z.
+Proof.
+  apply ge_l1_l2. lia.
+  apply ge_l1_l2. lia.
+  apply ge_l1_l2. lia.
+  apply ge_nil. Qed.
+  
+Example ge_list_2: ge_list [1; 2; 3]%Z nil -> False.
+Proof.
+  intros. inversion H. Qed.
+
+Example ge_list_3: ge_list [1; 3]%Z [1; 2]%Z.
+Proof.
+  apply ge_l1_l2. lia.
+  apply ge_l1_l2. lia.
+  apply ge_nil. Qed.
 
 Lemma hd_pos: forall (n: Z) (l: list Z),
-  AllPositive (n::l) -> (0 <= n)%Z.
+  all_positive (n::l) -> (0 <= n)%Z.
 Proof.
   intros n l H.
   inversion H. subst. apply H2. Qed.
 
 Lemma tl_pos : forall (n : Z) (l: list Z),
-  AllPositive (n::l) -> AllPositive l.
+  all_positive (n::l) -> all_positive l.
 Proof.
   intros n l H.
   inversion H. subst. apply H3. Qed.
 
-Lemma lte_flip_gte : forall (n m: Z),
-  (n <= m)%Z -> (m >= n)%Z.
-  intros n m H.
-  apply Zorder.Zle_not_lt in H.
-  apply Znot_lt_ge in H. 
-  apply H. Qed.
 
 Theorem pos_dot_product: forall (l1 l2: list Z),
-  AllPositive l1 -> AllPositive l2 -> (0 <= (dot_product l1 l2))%Z.
+  all_positive l1 -> all_positive l2 -> (0 <= (dot_product l1 l2))%Z.
 Proof.
   induction l1 as [| h1 t1 IH1].
   (* l1 = nil *)
@@ -106,58 +99,18 @@ Proof.
       apply Z.add_nonneg_nonneg.
       apply pos_hd_prod. apply pos_tl_prod.
       Qed.
-      
 
+Definition Perceptron_t : Type := (Z -> Z) -> (list Z) -> Z -> (list Z) -> Z.
 
+Definition perceptron (act: Z -> Z) (w: list Z) (b: Z) (input: list Z)
+  := act (b + dot_product input w)%Z.
+  
+Definition perceptron' := perceptron (fun x => x).
 
-(* Initial unsuccessful attempt using a fixpoint function *)
-
-Notation "x && y" := (andb x y).
-
-Fixpoint all_positive (l: list Z) : bool
-:= match l with
-  | nil => true
-  | hd :: tl => (0 <=? hd)%Z && (all_positive tl)
-  end.
-
-
-Lemma hd_pos' : forall (n: Z) (l: list Z),
-  all_positive (n::l) = true -> (0 <= n)%Z.
+Theorem perceptron_monotony: forall (w m n: list Z) (b: Z),
+  all_positive w -> 
+  (0 <= b)%Z ->
+  ge_list m n ->
+  (perceptron' w b m >= perceptron' w b n)%Z.
 Proof.
-  intros n l H.
-  destruct n.
-  (* n = 0 *)
-  - reflexivity.
-  (* n = Z.pos p *)
-  - rewrite <- Pos2Z.is_nonneg. reflexivity.
-  (* n = Z.neg p : reductio ad absurdum, induction hypothesis cannot be true.*)
-  - discriminate. Qed.
-
-Lemma tl_pos' : forall (n: Z) (l: list Z),
-  all_positive (n::l) = true -> all_positive l = true.
-Proof. 
-  intros n l H.
-  induction l as [| n' l' IH].
-  - reflexivity.
-  - simpl. assert (H2: (0 <=? n)%Z = true).
-    * Abort.
-
-
-Theorem pos_dot_product': forall (l1 l2: list Z),
-     (all_positive l1 = true) 
-  -> (all_positive l2) = true 
-  -> (0 <= dot_product l1 l2)%Z.
-Proof.
-  intros l1.
-  induction l1 as [| n1 l1' IH1].
-  - reflexivity.
-  - induction l2 as [| n2 l2' IH2].
-    * reflexivity.
-    * simpl.
-    Abort.
-
-  
-  
-  
-  
-  
+  Abort.
