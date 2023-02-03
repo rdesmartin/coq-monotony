@@ -105,12 +105,66 @@ Definition Perceptron_t : Type := (Z -> Z) -> (list Z) -> Z -> (list Z) -> Z.
 Definition perceptron (act: Z -> Z) (w: list Z) (b: Z) (input: list Z)
   := act (b + dot_product input w)%Z.
   
-Definition perceptron' := perceptron (fun x => x).
+Definition perceptron' w b i := (b + dot_product w i)%Z.
 
-Theorem perceptron_monotony: forall (w m n: list Z) (b: Z),
-  all_positive w -> 
+Lemma flip_ge: forall m n,
+  (m >= n)%Z -> (n <= m)%Z.
+Proof.
+  lia. Qed.
+
+Lemma dp_lte: forall (w m n: list Z),
+  all_positive w ->
+  all_positive n ->
+  all_positive m -> 
+  ge_list m n ->
+  (dot_product w n <= dot_product w m)%Z.
+Proof.
+  induction w as [| hw tw IHw].
+  - reflexivity.
+  - intros m n pos_w pos_n pos_m ge_mn.
+    inversion pos_w; subst.
+    destruct n as [| hn tn].
+    * destruct m.
+      ** reflexivity.
+      ** simpl. inversion pos_m; subst.
+         assert (pos_tw_m: (0 <= dot_product tw m)%Z).
+         { 
+          apply pos_dot_product.
+          assumption.
+          assumption. 
+         }
+         lia.
+    * destruct m as [| hm tm].
+      ** inversion ge_mn.
+      ** simpl.
+         assert (H7: (dot_product tw tn <= dot_product tw tm)%Z).
+         { 
+          apply IHw.
+          assumption.
+          inversion pos_n; subst; assumption.
+          inversion pos_m; subst; assumption.
+          inversion ge_mn; subst; assumption.
+         }
+         assert (H8: (hw * hn <= hw * hm)%Z).
+         {
+          inversion pos_w; subst.
+          inversion pos_m; subst.
+          inversion pos_n; subst.
+          inversion ge_mn; subst.
+          apply flip_ge in H11.
+          admit.
+          }
+    Abort.
+
+
+Theorem perceptron_monotony: forall (b: Z) (w m n: list Z),
+  all_positive w ->
+  all_positive n ->
   (0 <= b)%Z ->
   ge_list m n ->
-  (perceptron' w b m >= perceptron' w b n)%Z.
+  (perceptron' w b n <= perceptron' w b m)%Z.
 Proof.
   Abort.
+  
+  
+  
