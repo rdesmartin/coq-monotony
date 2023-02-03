@@ -93,7 +93,7 @@ Lemma flip_ge: forall m n,
 Proof.
   lia. Qed.
 
-Lemma dp_lte: forall (w m n: list Z),
+Lemma dp_pos_monotony: forall (w m n: list Z),
   all_positive w ->
   all_positive n ->
   all_positive m -> 
@@ -112,13 +112,13 @@ Proof.
          { 
           apply pos_dot_product.
           assumption.
-          assumption. 
+          assumption.
          }
          lia.
     * destruct m as [| hm tm].
       ** inversion ge_mn.
       ** simpl.
-         assert (H7: (dot_product tw tn <= dot_product tw tm)%Z).
+         assert (dot_product tw tn <= dot_product tw tm)%Z.
          { 
           apply IHw.
           assumption.
@@ -126,26 +126,27 @@ Proof.
           inversion pos_m; subst; assumption.
           inversion ge_mn; subst; assumption.
          }
-         assert (H8: (hw * hn <= hw * hm)%Z).
+         assert (hw * hn <= hw * hm)%Z.
          {
-          inversion pos_w; subst.
           inversion pos_m; subst.
           inversion pos_n; subst.
           inversion ge_mn; subst.
-          apply flip_ge in H11.
-          admit.
+          apply flip_ge in H9. (* flip hm >= hn to hn <= hm *)
+          (* the lia tactic did not work automatically here *)
+          apply Z.mul_le_mono_nonneg_l.
+          assumption. assumption.
           }
-    Abort.
-
+          lia.
+    Qed.
 
 Theorem perceptron_monotony: forall (b: Z) (w m n: list Z),
   all_positive w ->
+  all_positive m ->
   all_positive n ->
   (0 <= b)%Z ->
   ge_list m n ->
   (perceptron' w b n <= perceptron' w b m)%Z.
 Proof.
+  intros b w m n pos_w pos_m pos_n pos_b ge_mn.
   Abort.
-  
-  
   
