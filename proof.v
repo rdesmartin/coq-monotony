@@ -15,6 +15,31 @@ Fixpoint dot_product (l1: list Z) (l2: list Z) : Z
     | (h1::t1, h2::t2) => h1 * h2 + (dot_product t1 t2)
     end.
 
+Inductive list_all: (Z -> Prop) -> list Z -> Prop
+:=  | la_nil pred : list_all pred nil
+    | la_cons (pred: Z -> Prop) (hd: Z) tl : pred hd -> list_all pred tl -> list_all pred (hd :: tl).
+
+Example list_all1 :
+  list_all (fun x => (0 <= x)%Z) [1; 2; 3]%Z.
+Proof.
+  repeat (constructor; try apply Pos2Z.is_nonneg).
+  Qed.
+  
+Example list_all2:
+  list_all (fun x => (x <= 0)%Z) [-2; 0]%Z.
+Proof.
+  repeat (constructor; try lia).
+Qed.
+  
+Example list_all3:
+  ~ list_all (fun x => (x <= 0)%Z) [-2; 1]%Z.
+  Proof.
+    intros H.
+    inversion H; subst.
+    inversion H4; subst.
+    lia. 
+    Qed.
+
 Inductive all_positive: list Z -> Prop
 :=  | ap_nil : all_positive nil
     | ap_cons (hd: Z) tl : (0 <= hd)%Z -> all_positive tl -> all_positive (hd :: tl).
@@ -48,6 +73,11 @@ Proof.
 Example ge_list_3: ge_list [1; 3]%Z [1; 2]%Z.
 Proof.
   repeat (constructor; try lia). Qed.
+
+
+Inductive monotonous: (Z -> Z) -> Prop
+:= | cons f : forall m n, ((n <= m)%Z -> (f n <= f m)%Z) -> monotonous f.
+
 
 Lemma hd_pos: forall (n: Z) (l: list Z),
   all_positive (n::l) -> (0 <= n)%Z.
@@ -84,9 +114,11 @@ Proof.
 Definition Perceptron_t : Type := (Z -> Z) -> (list Z) -> Z -> (list Z) -> Z.
 
 Definition perceptron (act: Z -> Z) (w: list Z) (b: Z) (input: list Z)
-  := act (b + dot_product input w)%Z.
+  := act (b + dot_product w input)%Z.
   
 Definition perceptron' w b i := (b + dot_product w i)%Z.
+
+Definition thresh k x := if (x <=? k)%Z then x else k.
 
 Lemma flip_ge: forall m n,
   (m >= n)%Z -> (n <= m)%Z.
@@ -139,14 +171,20 @@ Proof.
           lia.
     Qed.
 
-Theorem perceptron_monotony: forall (b: Z) (w m n: list Z),
+Theorem perceptron_monotony: forall (b: Z) (w m n: list Z) f,
   all_positive w ->
   all_positive m ->
   all_positive n ->
   (0 <= b)%Z ->
+  monotonous f ->
   ge_list m n ->
-  (perceptron' w b n <= perceptron' w b m)%Z.
+  (perceptron f w b n <= perceptron f w b m)%Z.
 Proof.
-  intros b w m n pos_w pos_m pos_n pos_b ge_mn.
+  intros b w m n f pos_w pos_m pos_n pos_b mon_f ge_mn.
+  change (f (b + dot_product w n) <= f (b + dot_product w m))%Z.
+  assert (le_dp: (dot_product w n <= dot_product w m)%Z).
+  { apply dp_pos_monotony. assumption. assumption. assumption. assumption. }
+  assert (le_z: (b + dot_product w n <= b + dot_product w m)%Z ).
+  { lia. }
+  inversion mon_f.
   Abort.
-  
